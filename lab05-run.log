@@ -1,0 +1,212 @@
+
+######## MISSION 0 - setup ########
+kind-citybike-gitops
+Waiting for deployment "argocd-repo-server" rollout to finish: 0 of 1 updated replicas are available...
+deployment "argocd-repo-server" successfully rolled out
+Waiting for 1 pods to be ready...
+partitioned roll out complete: 1 new pods have been updated...
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          29s
+argocd-applicationset-controller-5b46dffcbc-sbnh8   1/1     Running   0          29s
+argocd-dex-server-57bccbfbb6-ddvn5                  1/1     Running   0          29s
+argocd-notifications-controller-5fb6c97685-qvfw5    1/1     Running   0          29s
+argocd-redis-6b84c6f49b-drfx6                       1/1     Running   0          29s
+argocd-repo-server-755f565f4f-v9n9h                 1/1     Running   0          29s
+argocd-server-9d47c9989-5lwcs                       0/1     Running   0          29s
+
+######## MISSION 1 - deploy desired state (branch e2e-run starts at the original starter commit 4d1248d) ########
+remote: 
+remote: Create a pull request for 'e2e-run' on GitHub by visiting:        
+remote:      https://github.com/AlTAR333/lab05-devops/pull/new/e2e-run        
+remote: 
+--- kustomize render (ConfigMap name hash):
+  name: citybike-script-6dgthf428d
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: citybike
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AlTAR333/lab05-devops.git
+    targetRevision: e2e-run
+    path: gitops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: citybike
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+application.argoproj.io/citybike created
+Argo Synced at 4d1248d
+Waiting for deployment "citybike" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "citybike" rollout to finish: 1 of 2 updated replicas are available...
+deployment "citybike" successfully rolled out
+Argo Healthy
+NAME       SYNC STATUS   HEALTH STATUS
+citybike   Synced        Healthy
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/citybike   2/2     2            2           10s
+
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/citybike-67c7547597-5f4vf   1/1     Running   0          10s
+pod/citybike-67c7547597-v4ptt   1/1     Running   0          10s
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+service/citybike   ClusterIP   10.96.188.191   <none>        80/TCP    10s
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v1"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M1 smoke
+
+######## MISSION 2 - drift ########
+[10:08:19] BEFORE: replicas=2 ready=2
+deployment.apps/citybike scaled
+[10:08:19] scaled to 0 manually
+[10:08:21] app status: sync=Synced health=Progressing rev=4d1248d191d6a99d88e56d4b5ae925d874d910c1
+[10:08:21] AFTER: spec.replicas=2  (self-healed without manual restore: 1)
+Waiting for deployment "citybike" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "citybike" rollout to finish: 1 of 2 updated replicas are available...
+deployment "citybike" successfully rolled out
+sync=Synced health=Healthy rev=4d1248d191d6a99d88e56d4b5ae925d874d910c1
+RESULT PASS: M2 self-heal
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v1"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M2 smoke after heal
+
+######## MISSION 3 - Git-delivered outage ########
+Argo Synced at 1bb2921
+NAME       SYNC STATUS   HEALTH STATUS
+citybike   Synced        Healthy
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/citybike-67c7547597-ft9fv   1/1     Running   0          19s
+pod/citybike-67c7547597-gqsqj   1/1     Running   0          19s
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+service/citybike   ClusterIP   10.96.188.191   <none>        80/TCP    30s
+
+NAME                                            ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+endpointslice.discovery.k8s.io/citybike-vslkj   IPv4          3999    10.244.0.14,10.244.0.15   30s
+Selector:                 app.kubernetes.io/name=citybike
+Port:                     http  80/TCP
+TargetPort:               3999/TCP
+Endpoints:                10.244.0.14:3999,10.244.0.15:3999
+--- pods still Ready (probes hit the pod port directly):
+citybike-67c7547597-ft9fv ready=true
+citybike-67c7547597-gqsqj ready=true
+--- smoke (FAILURE EXPECTED):
+FAIL: Service is unreachable. Port-forward details:
+Forwarding from 127.0.0.1:18080 -> 3999
+Forwarding from [::1]:18080 -> 3999
+Handling connection for 18080
+E1110 10:08:40.058571   13499 portforward.go:424] "Unhandled Error" err="an error occurred forwarding 18080 -> 3999: error forwarding port 3999 to pod ab9e1d985b3de9949cf86bdfb289750be57ac381c0b909af53a1a9d8c8ae2f84, uid : failed to execute portforward in network namespace \"/var/run/netns/cni-91294da5-6d36-041a-cdec-195d276541ac\": failed to connect to localhost:3999 inside namespace \"ab9e1d985b3de9949cf86bdfb289750be57ac381c0b909af53a1a9d8c8ae2f84\", IPv4: dial tcp4 127.0.0.1:3999: connect: connection refused IPv6 dial tcp6 [::1]:3999: connect: connection refused "
+error: lost connection to pod
+RESULT PASS: M3 smoke failed as expected
+--- Revert via Git:
+Argo Synced at 0a95a7d
+TargetPort:               3000/TCP
+Endpoints:                10.244.0.14:3000,10.244.0.15:3000
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v1"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M3 smoke after Git revert
+
+######## MISSION 4 - Restricted Pod Security ########
+namespace/citybike labeled
+namespace/citybike labeled
+Argo Synced at 516010c
+Waiting for deployment "citybike" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "citybike" rollout to finish: 1 old replicas are pending termination...
+deployment "citybike" successfully rolled out
+RESULT PASS: M4 hardened rollout
+Warning: existing pods in namespace "citybike" violate the new PodSecurity enforce level "restricted:latest"
+Warning: citybike-67c7547597-ft9fv (and 1 other pod): allowPrivilegeEscalation != false, unrestricted capabilities, runAsNonRoot != true, seccompProfile
+namespace/citybike labeled
+NAME       STATUS   AGE   LABELS
+citybike   Active   60s   kubernetes.io/metadata.name=citybike,pod-security.kubernetes.io/audit=restricted,pod-security.kubernetes.io/enforce=restricted,pod-security.kubernetes.io/warn=restricted
+Argo Synced at 5901b10
+Waiting for deployment "citybike" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "citybike" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "citybike" rollout to finish: 1 old replicas are pending termination...
+deployment "citybike" successfully rolled out
+RESULT PASS: M4 rollout under enforce=restricted
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES           SELECTOR
+deployment.apps/citybike   2/2     2            2           72s   citybike     node:22-alpine   app.kubernetes.io/name=citybike
+
+NAME                            READY   STATUS        RESTARTS   AGE   IP            NODE                            NOMINATED NODE   READINESS GATES
+pod/citybike-5d895cb7f6-nk48k   1/1     Terminating   0          21s   10.244.0.16   citybike-gitops-control-plane   <none>           <none>
+pod/citybike-5d895cb7f6-t7cwt   1/1     Terminating   0          19s   10.244.0.17   citybike-gitops-control-plane   <none>           <none>
+pod/citybike-669944657c-hx59c   1/1     Running       0          10s   10.244.0.18   citybike-gitops-control-plane   <none>           <none>
+pod/citybike-669944657c-pqkcl   1/1     Running       0          7s    10.244.0.19   citybike-gitops-control-plane   <none>           <none>
+--- security context of a running pod:
+{"fsGroup":1000,"runAsGroup":1000,"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}}
+{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}
+--- proof enforcement is real: privileged pod must be rejected
+Error from server (Forbidden): pods "bad" is forbidden: violates PodSecurity "restricted:latest": privileged (container "bad" must not set securityContext.privileged=true), allowPrivilegeEscalation != false (container "bad" must set securityContext.allowPrivilegeEscalation=false), unrestricted capabilities (container "bad" must set securityContext.capabilities.drop=["ALL"]), runAsNonRoot != true (pod or container "bad" must set securityContext.runAsNonRoot=true), seccompProfile (pod or container "bad" must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost")
+RESULT PASS: privileged pod rejected
+NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+citybike   2/2     2            2           72s
+Argo Healthy
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v2"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M4 smoke
+
+######## MISSION 5 - readiness failure ########
+Argo Synced at 80914e0
+Waiting for deployment "citybike" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "citybike" rollout to finish: 1 out of 2 new replicas have been updated...
+error: timed out waiting for the condition
+rollout status exit code: 1 (non-zero = stalled, expected)
+NAME                        READY   STATUS    RESTARTS   AGE
+citybike-669944657c-hx59c   1/1     Running   0          93s
+citybike-669944657c-pqkcl   1/1     Running   0          90s
+citybike-79d5478c95-bqgqv   0/1     Running   0          79s
+Replicas:               2 desired | 1 updated | 3 total | 2 available | 1 unavailable
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    ReplicaSetUpdated
+OldReplicaSets:  citybike-67c7547597 (0/0 replicas created), citybike-5d895cb7f6 (0/0 replicas created), citybike-669944657c (2/2 replicas created)
+NAME                  DESIRED   CURRENT   READY   AGE
+citybike-5d895cb7f6   0         0         0       104s
+citybike-669944657c   2         2         2       93s
+citybike-67c7547597   0         0         0       2m35s
+citybike-79d5478c95   1         1         0       79s
+--- argo status during stalled rollout: sync=Synced health=Progressing rev=80914e0410d6a391a65d06a4a6d4f067c30b97cc
+--- old pods still serve traffic:
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v2"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M5 smoke during failed rollout
+--- probes compared on the stuck new pod:
+live=200 ready=503
+    Ready:          False
+    Readiness:  http-get http://:http/health/ready delay=2s timeout=1s period=5s #success=1 #failure=3
+  Warning  Unhealthy  2s (x17 over 81s)  kubelet            spec.containers{citybike}: Readiness probe failed: HTTP probe failed with statuscode: 503
+--- fix via Git revert:
+Argo Synced at 64520ba
+deployment "citybike" successfully rolled out
+RESULT PASS: M5 healthy rollout after fix
+Argo Healthy
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/citybike   2/2     2            2           2m46s
+
+NAME                            READY   STATUS        RESTARTS   AGE
+pod/citybike-669944657c-hx59c   1/1     Running       0          104s
+pod/citybike-669944657c-pqkcl   1/1     Running       0          101s
+pod/citybike-79d5478c95-bqgqv   0/1     Terminating   0          90s
+{"stations":[{"id":"central","name":"Central Square","bikes":9},{"id":"riverside","name":"Riverside Park","bikes":0},{"id":"campus","name":"University Campus","bikes":6}],"release":"v2"}
+PASS: Service is reachable on port 18080
+RESULT PASS: M5 final smoke
+
+######## FINAL ########
+sync=Synced health=Healthy rev=64520ba4a1ba37227d91442b74c58f73f67e0983
+64520ba Revert "Mission 5: [INCIDENT] READY_MODE=fail (readiness failure drill)"
+80914e0 Mission 5: [INCIDENT] READY_MODE=fail (readiness failure drill)
+5901b10 Mission 4: bump APP_RELEASE to v2 to prove rollout under enforce=restricted
+516010c Mission 4: harden Deployment for Restricted Pod Security Standard
+0a95a7d Revert "Mission 3: [INCIDENT] change Service targetPort to 3999 (intentional break)"
+1bb2921 Mission 3: [INCIDENT] change Service targetPort to 3999 (intentional break)
+ALL CHECKS PASSED
