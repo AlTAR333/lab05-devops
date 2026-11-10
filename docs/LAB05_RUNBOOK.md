@@ -1,6 +1,8 @@
 # Lab 05 – GitOps Under Pressure: runbook, answers, evidence
 
-> **Status of this document.** Prepared offline. The Git changes below were rendered with
+> **Update:** the real cluster run has since been captured – see `docs/LAB05_EVIDENCE.md` and `docs/evidence/lab05-run.log`. The "Expected"/prediction wording below was written before that run.
+>
+> **Original status.** Prepared offline. The Git changes below were rendered with
 > `kustomize build`, schema-checked with `kubeconform` and policy-checked with
 > `scripts/check-restricted.py`; the app was run locally as UID 1000. **No Kubernetes/Argo CD
 > cluster was available, so every "Expected" block is a prediction, not captured output.**
