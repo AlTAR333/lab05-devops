@@ -37,7 +37,7 @@ spec:
               containerPort: 3000
           env:
             - name: APP_RELEASE
-              value: "v1"
+              value: "v2"
             - name: READY_MODE
               value: "ok"
           readinessProbe:
