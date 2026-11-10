@@ -111,7 +111,7 @@ kubectl label namespace citybike pod-security.kubernetes.io/enforce=restricted -
 # merge APP_RELEASE=v2 commit; wait for Argo
 kubectl -n citybike rollout status deployment/citybike --timeout=180s
 kubectl -n citybike get pods -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.securityContext.runAsUser}{"\n"}{end}'
-curl via smoke: bash scripts/smoke-service.sh
+bash scripts/smoke-service.sh
 ```
 Why this order: enforcing first would have rejected the un-hardened ReplicaSet's replacement pods; warn/audit first
 shows violations without blocking. Because `maxUnavailable: 0`, old pods keep serving during the rollout (no downtime).
@@ -131,7 +131,7 @@ declare a `Namespace` manifest with the labels in `gitops/`. Document that trade
 ## Mission 5 – readiness failure
 Prepared commits `15f154b` (READY_MODE=fail) and `67ac680` (revert).
 ```bash
-kubectl -n citybike rollout status deployment/citybike --timeout=75s   # times out: "Waiting for ... 1 out of 2 new replicas have been updated"? / 1 old available
+kubectl -n citybike rollout status deployment/citybike --timeout=75s   # expected: times out (new ReplicaSet never gets Ready)
 kubectl -n citybike get pods          # 2 old Ready + 1 new 0/1 Running
 kubectl -n citybike describe deployment citybike   # NewReplicaSet progressing, ProgressDeadlineExceeded after 600s
 kubectl -n citybike get events --sort-by=.lastTimestamp | tail
