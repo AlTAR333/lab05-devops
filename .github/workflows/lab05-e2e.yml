@@ -1,0 +1,43 @@
+name: lab05-e2e
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: citybike-gitops
+          config: kind-config.yaml
+          wait: 180s
+      - name: Install Argo CD
+        run: |
+          kubectl config current-context
+          kubectl create namespace argocd
+          kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - name: Run Missions 0-5
+        env:
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          E2E_BRANCH: e2e-run
+          BASE_COMMIT: 4d1248d191d6a99d88e56d4b5ae925d874d910c1
+          HARDEN_COMMIT: 9503df0
+          RELEASE_COMMIT: 157b4ad
+          READY_FAIL_COMMIT: 15f154b
+          EVIDENCE_DIR: evidence
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          mkdir -p evidence; cp scripts/e2e.sh /tmp/e2e.sh   # the script switches branches, so run a copy
+          bash /tmp/e2e.sh 2>&1 | tee evidence/lab05-run.log; exit ${PIPESTATUS[0]}
+      - name: Dump on failure
+        if: failure()
+        run: |
+          kubectl -n argocd get applications.argoproj.io citybike -o yaml | tail -60 || true
+          kubectl -n citybike get events --sort-by=.lastTimestamp | tail -30 || true
+          kubectl -n argocd logs deploy/argocd-repo-server --tail=40 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: lab05-evidence, path: evidence/ }
