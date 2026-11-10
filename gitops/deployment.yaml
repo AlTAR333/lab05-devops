@@ -39,7 +39,7 @@ spec:
             - name: APP_RELEASE
               value: "v2"
             - name: READY_MODE
-              value: "fail"
+              value: "ok"
           readinessProbe:
             httpGet:
               path: /health/ready
