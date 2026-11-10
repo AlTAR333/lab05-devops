@@ -1,5 +1,8 @@
 name: lab05-e2e
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches: [run-e2e]   # push to this branch to start a run
 permissions:
   contents: write
 jobs:
@@ -41,3 +44,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: lab05-evidence, path: evidence/ }
+      - name: Publish evidence log to branch e2e-evidence
+        if: always()
+        run: |
+          mkdir -p /tmp/ev && cp -r evidence/. /tmp/ev/ 2>/dev/null || true
+          git -c user.name="github-actions" -c user.email="actions@users.noreply.github.com" checkout -q --orphan e2e-evidence
+          git rm -rqf . 2>/dev/null || true; find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/ev/. . ; echo "run: ${GITHUB_RUN_ID} sha: ${GITHUB_SHA}" > RUN_INFO.txt
+          git add -A && git -c user.name="github-actions" -c user.email="actions@users.noreply.github.com" commit -qm "Lab 05 e2e evidence (run ${GITHUB_RUN_ID})"
+          git push -q -f origin HEAD:refs/heads/e2e-evidence
